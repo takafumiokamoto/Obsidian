@@ -3,8 +3,8 @@
 ## psql
 
 ```shell
-# ログイン
+# login
 psql -h <hostname> -p <port> -U <username> -d <dbname>
-# sqlファイル実行
+# execute sql file
 psql -f <file-path> -h <hostname> -p <port> -U <username> -d <dbname>
 ```
