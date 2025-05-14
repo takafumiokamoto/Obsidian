@@ -1,8 +1,32 @@
-.PHONY: c ## create commit
-c:
+# Get the current date and time in YYYYMMDD:HH:mm:ss format
+# This needs to be OS-dependent.
+
+# Default for Linux/macOS
+CURRENT_DATETIME := $(shell date +%Y%m%d:%H:%M:%S)
+
+# Override for Windows using PowerShell (more reliable for formatting)
+ifeq ($(OS),Windows_NT)
+    CURRENT_DATETIME := $(shell powershell -Command "Get-Date -Format 'yyyyMMdd:HH:mm:ss'")
+endif
+
+.PHONY: deploy
+
+deploy:
+	@echo "Staging all changes..."
 	git add .
-	git commit -m "`date`"
+	@echo "Creating commit with message: $(CURRENT_DATETIME)..."
+	git commit -m "$(CURRENT_DATETIME)"
+	@echo "Pushing changes..."
 	git push
+	@echo "Deployment complete."
+
+# You can add a simple test target for the date if you want
+.PHONY: show_date
+show_date:
+	@echo "Calculated datetime: $(CURRENT_DATETIME)"
+
+
+
 
 .PHONY: help  ## Display this message
 help:
