@@ -3,7 +3,7 @@ ifeq ($(OS),Windows_NT)
 else
 	CURRENT_DATETIME := $(shell date +%Y%m%d:%H:%M:%S)
 endif
-.PHONY: c
+.PHONY: c ## Create a new commit with the current date and time
 c:
 	git add .
 	git commit -m "$(CURRENT_DATETIME)"
