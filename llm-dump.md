@@ -1,196 +1,257 @@
-Yes, you absolutely can do this in GitHub Actions! It's a common use case for CI/CD pipelines.
+Okay, this is a common and useful task! We'll use Go's standard library for CSV handling, AES encryption (specifically AES-GCM, which is a recommended mode for its security and authentication features), and file operations.
 
-You'll essentially translate the shell script logic into workflow steps. Here's how you can structure it:
+Here's a Go program that does what you described.
 
-**Key Components:**
+**Key Considerations:**
 
-1.  **Trigger:** Decide when this workflow should run (e.g., on push to a specific branch, on manual trigger `workflow_dispatch`).
-2.  **AWS Credentials:** Securely provide AWS credentials to your workflow. The recommended way is using OpenID Connect (OIDC) with `aws-actions/configure-aws-credentials`.
-3.  **Install `jq`:** The runner environment might not have `jq` pre-installed.
-4.  **Fetch, Modify, Register:** These will be `run` steps executing AWS CLI commands.
+1.  **Encryption Key:** The security of your encrypted file depends entirely on the secrecy of your encryption key. **Never hardcode keys directly in production code.** For this example, we'll use a hardcoded key for simplicity, but in a real application, you'd want to:
+    *   Read it from a secure environment variable.
+    *   Use a secrets management system (like HashiCorp Vault, AWS KMS, Google Cloud KMS).
+    *   Prompt the user for it (less secure for automated processes).
+    The key must be 16, 24, or 32 bytes long for AES-128, AES-192, or AES-256 respectively. We'll use a 32-byte key for AES-256.
 
-Here's an example GitHub Actions workflow:
+2.  **Nonce (Initialization Vector - IV):** For AES-GCM, a unique nonce (number used once) is required for every encryption operation performed with the same key. We'll generate a random nonce and prepend it to the ciphertext. This is a common practice, as the decryptor will need it.
 
-```yaml
-name: Update ECS Task Definition Image
+3.  **Error Handling:** Robust error handling is crucial. We'll check for errors at each step.
 
-on:
-  workflow_dispatch: # Allows manual triggering with inputs
-    inputs:
-      task_family:
-        description: 'ECS Task Definition Family (e.g., my-app-task)'
-        required: true
-        default: 'your-task-definition-family'
-      new_image_uri:
-        description: 'New Docker Image URI (e.g., 123.dkr.ecr.region.amazonaws.com/repo:tag)'
-        required: true
-      container_name_to_update:
-        description: 'Container name to update (optional; updates first if blank)'
-        required: false
-      aws_region:
-        description: 'AWS Region (e.g., us-east-1)'
-        required: true
-        default: 'us-east-1'
-  # You could also trigger on push to main/master after an image build
-  # push:
-  #   branches:
-  #     - main
+4.  **Data Modification:** The "modify data" step is very generic. I'll include a placeholder function where you can implement your specific modification logic. For this example, let's say we'll add a new column with a static value or modify an existing one.
 
-jobs:
-  update-ecs-image:
-    runs-on: ubuntu-latest
-    permissions:
-      id-token: write # Required for OIDC
-      contents: read # Required for actions/checkout
+**Let's create the program:**
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+```go
+package main
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          # Replace with your IAM Role ARN configured for OIDC
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/YourGitHubActionsECSRole
-          aws-region: ${{ github.event.inputs.aws_region }}
-          # Alternatively, for static credentials (less secure, use GitHub Secrets):
-          # aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          # aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+import (
+	"bytes"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"encoding/csv"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+)
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+// IMPORTANT: In a real application, DO NOT hardcode the key.
+// Use environment variables, a secrets manager, or prompt the user.
+// This key must be 32 bytes for AES-256.
+var encryptionKey = []byte("a_very_secret_32_byte_long_key_") // Ensure this is 32 bytes
 
-      - name: Fetch current task definition
-        id: describe_task_def
-        run: |
-          echo "Fetching current task definition for family: ${{ github.event.inputs.task_family }}"
-          TASK_DEF_FULL_JSON=$(aws ecs describe-task-definition \
-            --task-definition "${{ github.event.inputs.task_family }}" \
-            --region "${{ github.event.inputs.aws_region }}")
+const resultDir = "result"
 
-          if [ $? -ne 0 ] || [ -z "$TASK_DEF_FULL_JSON" ]; then
-            echo "Error: Failed to fetch task definition for family '${{ github.event.inputs.task_family }}'."
-            exit 1
-          fi
-          # Output the 'taskDefinition' object for the next step
-          # This ensures we only pass the relevant part for modification and registration
-          TASK_DEF_OBJECT_JSON=$(echo "$TASK_DEF_FULL_JSON" | jq '.taskDefinition')
-          echo "task_definition_object<<EOF" >> $GITHUB_OUTPUT
-          echo "$TASK_DEF_OBJECT_JSON" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+func main() {
+	// --- 0. Configuration ---
+	if len(os.Args) < 2 {
+		log.Fatalf("Usage: %s <input_csv_file>", os.Args[0])
+	}
+	inputFile := os.Args[1]
 
-      - name: Modify task definition and Register new revision
-        id: register_task_def
-        env:
-          # Make inputs available as environment variables for the script block
-          TASK_FAMILY: ${{ github.event.inputs.task_family }}
-          NEW_IMAGE_URI: ${{ github.event.inputs.new_image_uri }}
-          CONTAINER_NAME_TO_UPDATE: ${{ github.event.inputs.container_name_to_update }}
-          AWS_REGION_INPUT: ${{ github.event.inputs.aws_region }}
-        run: |
-          CURRENT_TASK_DEF_OBJECT='${{ steps.describe_task_def.outputs.task_definition_object }}'
+	if len(encryptionKey) != 32 {
+		log.Fatalf(
+			"Encryption key must be 32 bytes long for AES-256. Got %d bytes.",
+			len(encryptionKey),
+		)
+	}
 
-          echo "Current task definition object (first 5 lines of containerDefinitions):"
-          echo "$CURRENT_TASK_DEF_OBJECT" | jq '.containerDefinitions' | head -n 5
+	// --- 1. Ensure result directory exists ---
+	if err := os.MkdirAll(resultDir, 0755); err != nil {
+		log.Fatalf("Failed to create result directory '%s': %v", resultDir, err)
+	}
+	fmt.Printf("Result directory '%s' ensured.\n", resultDir)
 
-          if [ -n "$CONTAINER_NAME_TO_UPDATE" ]; then
-            echo "Updating image for container '$CONTAINER_NAME_TO_UPDATE' to '$NEW_IMAGE_URI'"
-            UPDATED_TASK_DEF_PAYLOAD=$(echo "$CURRENT_TASK_DEF_OBJECT" | jq \
-              --arg IMAGE_URI "$NEW_IMAGE_URI" \
-              --arg CONTAINER_NAME "$CONTAINER_NAME_TO_UPDATE" '
-              (.containerDefinitions[] | select(.name == $CONTAINER_NAME) | .image) = $IMAGE_URI |
-              del(.taskDefinitionArn, .revision, .status, .compatibilities, .registeredAt, .registeredBy, .deregisteredAt, .requiresAttributes)
-            ')
-          else
-            echo "CONTAINER_NAME_TO_UPDATE not set. Updating image for the first container to '$NEW_IMAGE_URI'."
-            UPDATED_TASK_DEF_PAYLOAD=$(echo "$CURRENT_TASK_DEF_OBJECT" | jq \
-              --arg IMAGE_URI "$NEW_IMAGE_URI" '
-              .containerDefinitions[0].image = $NEW_IMAGE_URI |
-              del(.taskDefinitionArn, .revision, .status, .compatibilities, .registeredAt, .registeredBy, .deregisteredAt, .requiresAttributes)
-            ')
-          fi
+	// --- 2. Read CSV file ---
+	fmt.Printf("Reading CSV file: %s\n", inputFile)
+	records, err := readCSV(inputFile)
+	if err != nil {
+		log.Fatalf("Failed to read CSV file: %v", err)
+	}
+	if len(records) == 0 {
+		log.Fatalf("CSV file '%s' is empty or could not be parsed.", inputFile)
+	}
+	fmt.Printf("Successfully read %d records (including header).\n", len(records))
 
-          if [ -z "$UPDATED_TASK_DEF_PAYLOAD" ] || [ "$UPDATED_TASK_DEF_PAYLOAD" == "null" ]; then
-              echo "Error: Failed to modify task definition using jq."
-              echo "This might happen if CONTAINER_NAME_TO_UPDATE ('$CONTAINER_NAME_TO_UPDATE') was not found,"
-              echo "or if the task definition structure is unexpected."
-              exit 1
-          fi
+	// --- 3. Modify data ---
+	fmt.Println("Modifying CSV data...")
+	modifiedRecords := modifyData(records)
+	fmt.Println("Data modification complete.")
 
-          echo "--- Payload to be registered (first 15 lines) ---"
-          echo "$UPDATED_TASK_DEF_PAYLOAD" | head -n 15
-          echo "-------------------------------------------------"
+	// --- 4. Convert modified data back to CSV format (in memory) ---
+	var csvBuffer bytes.Buffer
+	csvWriter := csv.NewWriter(&csvBuffer)
+	if err := csvWriter.WriteAll(modifiedRecords); err != nil {
+		log.Fatalf("Failed to write modified data to CSV buffer: %v", err)
+	}
+	csvWriter.Flush() // Ensure all data is written to the buffer
+	if err := csvWriter.Error(); err != nil {
+		log.Fatalf("Error flushing CSV writer: %v", err)
+	}
 
-          # Save payload to a temporary file for --cli-input-json
-          echo "$UPDATED_TASK_DEF_PAYLOAD" > ./new_task_definition_payload.json
+	plaintextData := csvBuffer.Bytes()
+	fmt.Printf(
+		"Modified data converted to CSV format (size: %d bytes).\n",
+		len(plaintextData),
+	)
 
-          echo "Registering new task definition revision..."
-          REGISTER_OUTPUT=$(aws ecs register-task-definition \
-            --region "$AWS_REGION_INPUT" \
-            --cli-input-json file://./new_task_definition_payload.json)
+	// --- 5. Encrypt modified CSV data with AES-GCM ---
+	fmt.Println("Encrypting data...")
+	encryptedData, err := encryptAESGCM(plaintextData, encryptionKey)
+	if err != nil {
+		log.Fatalf("Failed to encrypt data: %v", err)
+	}
+	fmt.Printf(
+		"Data encrypted successfully (output size: %d bytes).\n",
+		len(encryptedData),
+	)
 
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to register new task definition revision."
-            echo "AWS CLI Output:"
-            echo "$REGISTER_OUTPUT"
-            exit 1
-          fi
+	// --- 6. Output encrypted CSV file in result directory ---
+	baseName := filepath.Base(inputFile)
+	outputFileName := strings.TrimSuffix(baseName, filepath.Ext(baseName)) +
+		"_encrypted.bin"
+	outputFilePath := filepath.Join(resultDir, outputFileName)
 
-          NEW_TASK_DEF_ARN=$(echo "$REGISTER_OUTPUT" | jq -r '.taskDefinition.taskDefinitionArn')
-          echo "new_task_def_arn=$NEW_TASK_DEF_ARN" >> $GITHUB_OUTPUT
-          echo "Successfully registered new task definition!"
-          echo "New Task Definition ARN: $NEW_TASK_DEF_ARN"
+	fmt.Printf("Writing encrypted data to: %s\n", outputFilePath)
+	err = os.WriteFile(outputFilePath, encryptedData, 0644)
+	if err != nil {
+		log.Fatalf("Failed to write encrypted file: %v", err)
+	}
 
-      - name: Output New Task Definition ARN
-        run: |
-          echo "The new task definition ARN is: ${{ steps.register_task_def.outputs.new_task_def_arn }}"
-          echo "You might want to use this ARN in a subsequent step to update an ECS service."
-          echo "Example: aws ecs update-service --cluster YOUR_CLUSTER --service YOUR_SERVICE --task-definition ${{ steps.register_task_def.outputs.new_task_def_arn }}"
+	fmt.Printf(
+		"Successfully encrypted '%s' and saved to '%s'\n",
+		inputFile,
+		outputFilePath,
+	)
+}
+
+func readCSV(filePath string) ([][]string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("could not open file %s: %w", filePath, err)
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	// You can configure the reader if needed, e.g., reader.Comma = ';'
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("could not read CSV data from %s: %w", filePath, err)
+	}
+	return records, nil
+}
+
+// modifyData is where you implement your specific data transformation logic.
+// This is just an example: adds a new column "Status" and modifies an existing one.
+func modifyData(records [][]string) [][]string {
+	if len(records) == 0 {
+		return records
+	}
+
+	modified := make([][]string, len(records))
+
+	// Modify header
+	header := records[0]
+	modified[0] = append(header, "Processing_Status") // Add new column header
+
+	// Modify data rows
+	for i := 1; i < len(records); i++ {
+		row := records[i]
+		newRow := make([]string, len(row))
+		copy(newRow, row)
+
+		// Example modification 1: Convert first column to uppercase (if it exists)
+		if len(newRow) > 0 {
+			newRow[0] = strings.ToUpper(newRow[0])
+		}
+
+		// Example modification 2: Add data for the new column
+		newRow = append(newRow, "Processed")
+
+		modified[i] = newRow
+	}
+	return modified
+}
+
+func encryptAESGCM(plaintext []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not create AES cipher: %w", err)
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("could not create GCM cipher mode: %w", err)
+	}
+
+	// Never use more than 2^32 random nonces with a given key because of the risk of repeat.
+	nonce := make([]byte, aesgcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, fmt.Errorf("could not generate nonce: %w", err)
+	}
+
+	// Seal will append the ciphertext to the nonce.
+	// The first argument to Seal is a dst buffer, which can be nil to allocate a new one.
+	// We prepend the nonce to the ciphertext for storage.
+	// So, the structure of the output will be: [nonce][ciphertext]
+	ciphertext := aesgcm.Seal(nil, nonce, plaintext, nil)
+	return append(nonce, ciphertext...), nil // Prepend nonce to ciphertext
+}
+
+// To decrypt (for your reference, not used in this program directly):
+/*
+func decryptAESGCM(ciphertextWithNonce []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not create AES cipher: %w", err)
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("could not create GCM cipher mode: %w", err)
+	}
+
+	nonceSize := aesgcm.NonceSize()
+	if len(ciphertextWithNonce) < nonceSize {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+
+	nonce, ciphertext := ciphertextWithNonce[:nonceSize], ciphertextWithNonce[nonceSize:]
+
+	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not decrypt data: %w", err)
+	}
+	return plaintext, nil
+}
+*/
 ```
 
-**Before using this workflow:**
+**How to Use:**
 
-1.  **Create an IAM Role for GitHub Actions:**
-    *   Go to IAM in your AWS console.
-    *   Create a new role.
-    *   Select "Web identity" as the trusted entity type.
-    *   Identity provider: Choose `OpenID Connect provider URL: https://token.actions.githubusercontent.com` (you might need to create this OIDC provider in IAM if it's your first time).
-    *   Audience: `sts.amazonaws.com`.
-    *   Add permissions: You'll need at least:
-        *   `ecs:DescribeTaskDefinition`
-        *   `ecs:RegisterTaskDefinition`
-        *   (If you plan to update services later): `ecs:UpdateService`, `iam:PassRole` (for the task execution role and task role).
-    *   Give the role a name (e.g., `YourGitHubActionsECSRole`).
-    *   Note down the ARN of this role.
+1.  **Save:** Save the code above as `csv_encryptor.go`.
+2.  **Create a Sample CSV:** Create a file named `input.csv` (or any name you like) in the same directory. For example:
+    ```csv
+    ID,Name,Value
+    1,Alice,100
+    2,Bob,200
+    3,Charlie,150
+    ```
+3.  **Modify Key (Optional but Recommended for Testing):**
+    Change the `encryptionKey` variable to a different 32-byte string if you wish. Remember, it *must* be 32 bytes.
+4.  **Run:**
+    Open your terminal in the directory where you saved the files and run:
+    ```bash
+    go run csv_encryptor.go input.csv
+    ```
+    If you named your CSV file differently, use that name instead of `input.csv`.
 
-2.  **Add Secrets to GitHub Repository:**
-    *   Go to your GitHub repository > Settings > Secrets and variables > Actions.
-    *   Add a new repository secret:
-        *   `AWS_ACCOUNT_ID`: Your 12-digit AWS Account ID.
-        *   (If not using OIDC) `AWS_ACCESS_KEY_ID`: Your AWS access key.
-        *   (If not using OIDC) `AWS_SECRET_ACCESS_KEY`: Your AWS secret key.
+5.  **Output:**
+    *   A directory named `result` will be created (if it doesn't exist).
+    *   Inside `result`, you'll find a file named `input_encrypted.bin` (or `<your_input_filename>_encrypted.bin`). This file contains the nonce prepended to the AES-GCM encrypted version of your modified CSV data.
 
-3.  **Customize Workflow Inputs:**
-    *   Update the `default` values for `task_family` and `aws_region` in the `workflow_dispatch` inputs, or provide them when you run the workflow.
-    *   The `new_image_uri` will typically come from a previous step in your CI/CD pipeline that builds and pushes your Docker image (e.g., to ECR). You would then pass that output as an input to this job or this workflow. For this standalone example, it's a manual input.
+**To implement your specific data modification:**
 
-**How it works:**
+*   Edit the `modifyData` function. The `records` variable it receives is a `[][]string`, where `records[0]` is the header row and subsequent elements are data rows. Each row is a `[]string`.
 
-1.  **`on: workflow_dispatch`**: Allows you to trigger this workflow manually from the Actions tab in GitHub and provide inputs.
-2.  **`permissions`**: Grants the necessary permissions for the OIDC token exchange.
-3.  **`aws-actions/configure-aws-credentials@v4`**: This action securely fetches temporary AWS credentials using the OIDC role.
-4.  **`Install jq`**: Ensures `jq` is available.
-5.  **`Fetch current task definition`**:
-    *   Uses `aws ecs describe-task-definition` to get the JSON of the latest active task definition.
-    *   Crucially, it then uses `jq '.taskDefinition'` to extract *only the `taskDefinition` object* from the full response. This is because `register-task-definition` expects this object directly, not the entire `describe-task-definition` output.
-    *   The `taskDefinition` object is passed to the next step using `GITHUB_OUTPUT`.
-6.  **`Modify task definition and Register new revision`**:
-    *   Retrieves the `task_definition_object` from the previous step.
-    *   Uses `jq` to modify the `image` field within the `containerDefinitions` array. It handles both updating a specific container by name (if `CONTAINER_NAME_TO_UPDATE` is provided) or updating the first container.
-    *   It also uses `jq` to `del` (delete) fields that are not allowed or are read-only when registering a new task definition (like `taskDefinitionArn`, `revision`, `status`, etc.).
-    *   The modified JSON payload is saved to a temporary file (`./new_task_definition_payload.json`).
-    *   `aws ecs register-task-definition --cli-input-json file://./new_task_definition_payload.json` registers the new revision. Using `file://` is robust for passing complex JSON.
-    *   The ARN of the newly registered task definition is captured using `jq` and set as an output of this step.
-7.  **`Output New Task Definition ARN`**: A simple step to display the ARN. You would typically use this ARN in a subsequent step to update an ECS service.
-
-This workflow provides a solid foundation for automating your ECS task definition updates. Remember to adapt the IAM role permissions and workflow inputs to your specific needs.
+This program provides a solid foundation. Remember the warning about the encryption key for any real-world use!
