@@ -1,6 +1,6 @@
-# Self-hosted Runner on ECS with GitHub App and Docker-in-Docker
+# Guide to Self-Hosted GitHub Runner on AWS ECS with GitHub App and EC2
 Created: 6/16/2025, 2:18:40 PM
-Last Updated: 6/16/2025, 2:25:16 PM
+Last Updated: 6/16/2025, 3:27:25 PM
 ---
 
 ### User
@@ -101,7 +101,7 @@ You can now ask me about each step individually, and I will provide the detailed
 
 ### User
 
-Let's jump to Step 5
+Let's jump to Step 3
 
 
 ---
@@ -111,302 +111,318 @@ Let's jump to Step 5
 <details>
 <summary>Reasoning</summary>
 
-**Elaborating the Task**
+**Analyzing the Prompt's Core**
 
-I'm now zeroing in on the core of the user's request. My current focus is to carefully dissect "Create the ECS Task Definition with a Docker-in-Docker (DinD) Sidecar." I'm mentally breaking down the components: the ECS Task Definition, the DinD sidecar, and the implications of this setup. The goal is a clear, concise explanation of Step 5.
-
-
-**Refining the Approach**
-
-I'm now focusing on a more structured approach to explain Step 5. I've broken down the request into key concepts: the Task Definition's purpose, the necessity of the DinD sidecar, and the crucial connections between the runner, the DinD container, and the secrets/permissions. I intend to clarify why this configuration is essential for running Docker within the ECS task.
+I'm currently breaking down the user's request.  The core is defining AWS infrastructure, specifically for "Step 3: Define Core AWS Infrastructure with CloudFormation." The aim seems to be self-hosting, which adds further nuance.
 
 
-**Outlining the Components**
+**Refining Infrastructure Scope**
 
-I'm presently building the CloudFormation template, resource by resource. The focus is now on the `TaskDefinition`'s structure. I'm breaking down the template into manageable sections: parameters, the task role, container definitions, and volumes, ensuring a clear and organized explanation. My objective is to provide an easily digestible guide.
-
-
-**Analyzing the Structure**
-
-Now, I'm analyzing the CloudFormation template's structure in more detail. I'm focusing on the interaction between the runner and DinD containers within the `ContainerDefinitions`. The goal is to articulate the setup clearly: the volume mount, the shared Docker socket, and the runner's reliance on it. I also consider the security implications of this approach.
-
-\n\n
-**Revising the Template Logic**
-
-I'm now revising my initial logic for the CloudFormation template, paying close attention to the `ContainerDefinitions` section. Specifically, the DinD container's configuration (image, resource limits, etc.) and the runner container's link to the DinD socket, and the volumes, which will be the volume definition for the `docker-socket`. I'm verifying the parameters and resources align with best practices and will achieve a robust and secure configuration.
+I'm now zeroing in on the "core" aspect. The user wants to avoid unnecessary complexity for a self-hosted runner setup. This means focusing on the bare essentials: a VPC, subnets, an Internet Gateway, and route tables for the network. Then, an ECS cluster configured for EC2 instances and the security groups. I believe these are the critical pieces to deliver the foundation for the EC2 launch.
 
 
-**Configuring the Core Elements**
+**Prioritizing Resource Sequencing**
 
-I'm now focusing on the environment variables and mount points within the `ContainerDefinitions`. It's crucial that the `DOCKER_HOST` points correctly to the shared Docker socket, enabling the runner to use the DinD container. I'm double-checking the volume mount configuration to ensure proper communication between the containers. I'm also ensuring the secrets retrieval and environmental variables are setup according to best practices.
-
-
-**Clarifying the Communication**
-
-I'm now focusing on how the runner and DinD containers communicate. The crucial element is the shared Docker socket. I will explain how the runner, using the Python script (from Step 4), interacts with the Docker daemon within the DinD container. This includes the `DOCKER_HOST` environment variable and volume mounting.
+I've been thinking about the order of creation. Network components must be established first.  Then, I'll focus on the ECS cluster and the Launch Template for EC2 instances within the defined VPC. The security groups will need to be configured correctly and attached to the infrastructure. Finally, the Auto Scaling Group can launch the EC2 instances.
 
 
-**Structuring the CloudFormation**
+**Defining IAM and Logging**
 
-I'm now diving into the `ContainerDefinitions` section. My current focus is refining the runner and DinD configurations within the Task Definition.  I'm making sure `DOCKER_HOST` is correctly set, and the volume mounts and links are logical. Ensuring the GitHub App secrets are properly handled is a priority. I intend to provide a clear and secure approach.
+I'm now prioritizing the necessary IAM roles and policies. The EC2 instance role requires the `AmazonEC2ContainerServiceforEC2Role` managed policy and a custom policy for accessing the runner secrets. I'll also define a CloudWatch Log Group to capture container logs. This is key for monitoring and troubleshooting. I'll make sure the Log Group has appropriate retention settings as well.
 
 
-**Orchestrating the Runners**
+**Developing Template Logic**
 
-I'm now focusing on the central role of the `TaskDefinition` within the larger infrastructure. My goal is to craft a `ContainerDefinition` that ensures robust and secure communication. Specifically, I'm concentrating on the `docker-socket` volume, its mount, and the `DOCKER_HOST` environment variable to ensure the runner container can interact with the DinD container. This setup is crucial for executing Docker commands seamlessly.
+I'm now focusing on the CloudFormation template's structure. Parameters will include the cluster name, instance type, and the ARN of the secret. Resources will be grouped logically: VPC, subnets, internet gateway, route tables, security groups, IAM roles, CloudWatch log group, ECS cluster, Launch Template, and Auto Scaling Group. Outputs will provide the cluster name, security group ID, subnet IDs, and the EC2 instance role ARN.
+
+
+**Defining Runner Permissions**
+
+I'm now formulating the fine-grained permissions for the runner. The EC2 instance role requires `secretsmanager:GetSecretValue` on the specific secret ARN provided as a parameter. This ensures the runner can securely access its credentials. I'll also add a policy for reading the ECR repository if private images are used, and  the necessary permissions for `ecs:Poll`, `ecs:StartTask`, `ecs:StopTask`, `ecs:DescribeTasks` as well as CloudWatch logging.
+
+
+
+**Defining Instance Permissions**
+
+Now, I'm defining the necessary IAM permissions for the EC2 instances. The instances require the `AmazonEC2ContainerServiceforEC2Role` policy, along with specific access to the Secrets Manager to retrieve the runner credentials. I'll include a policy with `secretsmanager:GetSecretValue` on the secret ARN and also ECR access. This is essential for pullling the GitHub Actions Runner image.
+
+**Defining Fine-Grained Permissions**
+
+I'm now focusing on the essential IAM and security configurations for the runner. The EC2 instance role is granted the necessary permissions through `AmazonEC2ContainerServiceforEC2Role` policy. Additionally, I'll ensure the role can access the specified secret from Secrets Manager, adding `secretsmanager:GetSecretValue` on the secret ARN and also ECR access. This is essential for both retrieving the credentials and pulling the runner image from ECR, if the image is private. I'll make sure there is a CloudWatch Log Group defined, with the right permissions.
+
+
+**Optimizing Template Deployment**
+
+I'm currently focused on the deployment process. To make it easier for the user, I'll provide clear instructions and a sample command. I'm considering using `Fn::Sub` for resource names to enhance readability and ensure uniqueness. It's crucial the user understands the key parameters, specifically the secret ARN and cluster name. I'll make sure to highlight this in the instructions.
+
 
 
 
 </details>
 
-Excellent. Let's dive into Step 5. This is where we define how our containers will run together to form a single, functional unit.
+Excellent. Let's dive into creating the foundational AWS infrastructure. This step is crucial as it sets up the network, permissions, and compute resources where your runners will operate.
 
 ***
 
-### **Step 5: Create the ECS Task Definition with a Docker-in-Docker (DinD) Sidecar**
+### **Step 3: Define Core AWS Infrastructure with CloudFormation**
 
-A Task Definition is a blueprint for your application that tells ECS how to launch the containers. In our case, it will define two containers: our custom GitHub runner and a "Docker-in-Docker" (DinD) sidecar.
+In this step, we will create a CloudFormation template to provision the core AWS resources. This "core stack" will include:
 
-#### Why the Sidecar Pattern?
+*   **Networking:** A new VPC with public subnets, an Internet Gateway, and route tables to allow our runners to communicate with GitHub.
+*   **IAM Role:** A specific IAM Role for our EC2 instances. This role will grant the necessary permissions to connect to the ECS cluster and, critically, to fetch the GitHub App credentials from AWS Secrets Manager.
+*   **ECS Cluster:** A logical grouping for our runner services.
+*   **EC2 Auto Scaling Group:** This will manage the EC2 instances that join our ECS cluster. We will use a Launch Template to define the instance configuration, ensuring they use the latest ECS-optimized AMI.
+*   **Logging:** A CloudWatch Log Group to store logs from our runner containers for easier debugging.
 
-The core of this solution is the sidecar pattern.
-1.  **GitHub Runner Container**: This container runs the official GitHub Actions runner agent. Its job is to communicate with GitHub, pick up jobs, and execute the steps defined in your workflow files. It will have the Docker CLI installed.
-2.  **Docker-in-Docker (DinD) Sidecar**: This is a special container running the Docker daemon itself. Because it's configured as `privileged`, it can run a Docker service inside it, which is something the main runner container cannot do directly in a standard ECS setup.
+Using CloudFormation ensures our infrastructure is reproducible, version-controlled, and easy to manage.
 
-#### How They Communicate
+---
 
-The two containers will share a common volume.
-*   The DinD container will expose its Docker socket (`/var/run/docker.sock`) to this shared volume.
-*   The GitHub runner container will mount this same volume to its own `/var/run/docker.sock`.
+#### **CloudFormation Template: `core-infra.yml`**
 
-When the runner executes a `docker build` or `docker run` command, its local Docker CLI sends the command to `/var/run/docker.sock`. This command is seamlessly picked up by the Docker daemon running in the privileged DinD sidecar, which then executes the command.
-
-#### CloudFormation Template: `task-definition.yml`
-
-This CloudFormation template defines the `AWS::ECS::TaskDefinition` resource. It references the IAM roles we created in Step 3 and the runner image we built in Step 4.
-
-Save the following code as `task-definition.yml`:
+Below is the complete CloudFormation template. I've included comments to explain what each section does.
 
 ```yaml
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "ECS Task Definition for GitHub self-hosted runner with DinD sidecar."
+Description: >
+  Core infrastructure for self-hosted GitHub runners on ECS with EC2.
+  This stack creates a VPC, Subnets, an ECS Cluster, and an Auto Scaling
+  Group of EC2 instances ready to host runner containers.
 
 Parameters:
-  AppName:
+  ClusterName:
     Type: String
-    Description: "The name of the application, used for naming resources."
-    Default: "github-runner"
-  RunnerImageUri:
+    Default: "github-runners-cluster"
+    Description: The name for the ECS Cluster.
+  InstanceType:
     Type: String
-    Description: "The full ECR URI of the GitHub runner container image."
-  TaskCpu:
+    Default: "t3.medium"
+    Description: EC2 instance type for the ECS container instances.
+  DesiredCapacity:
+    Type: Number
+    Default: 1
+    Description: Desired number of EC2 instances in the Auto Scaling Group.
+  MaxSize:
+    Type: Number
+    Default: 5
+    Description: Maximum number of EC2 instances in the Auto Scaling Group.
+  SecretArn:
     Type: String
-    Description: "CPU units to allocate for the task."
-    Default: "1024" # 1 vCPU
-  TaskMemory:
-    Type: String
-    Description: "Memory to allocate for the task (in MiB)."
-    Default: "2048" # 2 GB
-  ExecutionRoleArn:
-    Type: String
-    Description: "ARN of the ECS Task Execution Role."
-  TaskRoleArn:
-    Type: String
-    Description: "ARN of the ECS Task Role for container permissions."
-  SecretsManagerSecretArn:
-    Type: String
-    Description: "ARN of the AWS Secrets Manager secret for GitHub App credentials."
+    Description: The full ARN of the AWS Secret containing the GitHub App credentials.
 
 Resources:
-  ECSTaskDefinition:
-    Type: "AWS::ECS::TaskDefinition"
+  # ------------------------------------------------------------#
+  # Networking
+  # ------------------------------------------------------------#
+  VPC:
+    Type: AWS::EC2::VPC
     Properties:
-      Family: !Sub "${AppName}-task"
-      NetworkMode: "awsvpc"
-      RequiresCompatibilities:
-        - "EC2"
-      Cpu: !Ref TaskCpu
-      Memory: !Ref TaskMemory
-      ExecutionRoleArn: !Ref ExecutionRoleArn
-      TaskRoleArn: !Ref TaskRoleArn
-      Volumes:
-        - Name: "docker-socket"
-          # We don't define a host path here; Docker will manage it.
-          # This creates a shared volume between the containers in the task.
-      ContainerDefinitions:
-        # Main GitHub Runner Container
-        - Name: "github-runner"
-          Image: !Ref RunnerImageUri
-          Essential: true
-          LogConfiguration:
-            LogDriver: "awslogs"
-            Options:
-              awslogs-group: !Sub "/ecs/${AppName}"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: "runner"
-          Secrets:
-            - Name: "GITHUB_APP_ID"
-              ValueFrom: !Sub "${SecretsManagerSecretArn}:GITHUB_APP_ID::"
-            - Name: "GITHUB_PRIVATE_KEY"
-              ValueFrom: !Sub "${SecretsManagerSecretArn}:GITHUB_PRIVATE_KEY::"
-            - Name: "GITHUB_INSTALLATION_ID"
-              ValueFrom: !Sub "${SecretsManagerSecretArn}:GITHUB_INSTALLATION_ID::"
-          Environment:
-            - Name: "DOCKER_HOST"
-              Value: "unix:///var/run/docker.sock"
-            - Name: "RUNNER_SCOPE" # e.g., 'repo' or 'org'
-              Value: "repo" # Change to 'org' if this is an organization runner
-            - Name: "GITHUB_OWNER"
-              Value: "your-github-username-or-org" # <-- TODO: Change this
-            - Name: "GITHUB_REPOSITORY"
-              Value: "your-github-repo" # <-- TODO: Change this
-            - Name: "RUNNER_LABELS"
-              Value: "ecs,ec2,docker"
-          MountPoints:
-            - SourceVolume: "docker-socket"
-              ContainerPath: "/var/run/docker.sock"
-          DependsOn:
-            - ContainerName: "docker-in-docker"
-              Condition: "START"
+      CidrBlock: "10.0.0.0/16"
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-VPC"
 
-        # Docker-in-Docker (DinD) Sidecar Container
-        - Name: "docker-in-docker"
-          Image: "docker:25-dind" # Use a specific, stable version
-          Essential: true
-          Privileged: true # This is why we need the EC2 launch type
-          LogConfiguration:
-            LogDriver: "awslogs"
-            Options:
-              awslogs-group: !Sub "/ecs/${AppName}"
-              awslogs-region: !Ref AWS::Region
-              awslogs-stream-prefix: "dind"
-          MountPoints:
-            - SourceVolume: "docker-socket"
-              ContainerPath: "/var/run/docker.sock"
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.1.0/24"
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-PublicSubnet1"
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: "10.0.2.0/24"
+      AvailabilityZone: !Select [1, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-PublicSubnet2"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-IGW"
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-PublicRouteTable"
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: "0.0.0.0/0"
+      GatewayId: !Ref InternetGateway
+
+  Subnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable
+
+  Subnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+
+  # ------------------------------------------------------------#
+  # Security & IAM
+  # ------------------------------------------------------------#
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Allow communication for ECS instances and containers"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        # This self-referencing rule is crucial for the Docker-in-Docker sidecar.
+        # It allows the runner container to communicate with the DinD container
+        # over the shared Docker socket volume.
+        - Description: "Allow all traffic from within the security group"
+          IpProtocol: "-1"
+          FromPort: -1
+          ToPort: -1
+          SourceSecurityGroupId: !GetAtt ECSSecurityGroup.GroupId
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ECSSecurityGroup"
+
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ec2.amazonaws.com]
+            Action: ["sts:AssumeRole"]
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+      Policies:
+        - PolicyName: "SecretsManagerGetSecretValue"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: "secretsmanager:GetSecretValue"
+                Resource: !Ref SecretArn
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref EC2InstanceRole
+
+  # ------------------------------------------------------------#
+  # ECS Cluster & Compute
+  # ------------------------------------------------------------#
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ClusterName
+
+  RunnerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/${ClusterName}"
+      RetentionInDays: 30
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${AWS::StackName}-LaunchTemplate"
+      LaunchTemplateData:
+        ImageId: !Resolve ssm:/aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+        InstanceType: !Ref InstanceType
+        IamInstanceProfile:
+          Arn: !GetAtt EC2InstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref ECSSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            echo ECS_CLUSTER=${ClusterName} >> /etc/ecs/ecs.config
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      DesiredCapacity: !Ref DesiredCapacity
+      MinSize: !Ref DesiredCapacity
+      MaxSize: !Ref MaxSize
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-ECSInstance"
+          PropagateAtLaunch: true
 
 Outputs:
-  TaskDefinitionArn:
-    Description: "The ARN of the created ECS Task Definition."
-    Value: !Ref ECSTaskDefinition
+  ClusterName:
+    Description: "The name of the ECS Cluster"
+    Value: !Ref ECSCluster
+  ECSSecurityGroupId:
+    Description: "The ID of the ECS Security Group"
+    Value: !Ref ECSSecurityGroup
+  PublicSubnet1Id:
+    Description: "ID of the first public subnet"
+    Value: !Ref PublicSubnet1
+  PublicSubnet2Id:
+    Description: "ID of the second public subnet"
+    Value: !Ref PublicSubnet2
+  EC2InstanceRoleArn:
+    Description: "ARN of the IAM Role for the EC2 instances"
+    Value: !GetAtt EC2InstanceRole.Arn
 ```
 
-#### Key Sections Explained
-
-*   **`RequiresCompatibilities: ["EC2"]`**: This explicitly states that the task can only run on EC2 instances, not on Fargate. This is required for the `Privileged` flag.
-*   **`Volumes`**: We define a single volume named `docker-socket`. This volume will be shared between our two containers.
-*   **`ContainerDefinitions`**:
-    *   **`github-runner`**:
-        *   **`Secrets`**: This is how we securely pass the GitHub App credentials from AWS Secrets Manager into the container as environment variables. Our Python entrypoint script will use these.
-        *   **`Environment`**:
-            *   `DOCKER_HOST`: This is critical. It tells the Docker CLI inside this container to communicate with the daemon via the shared socket file instead of its default path.
-            *   `GITHUB_OWNER` / `GITHUB_REPOSITORY`: **You must update these** to point to your repository. The Python script uses these to request the correct registration token.
-        *   **`MountPoints`**: Mounts the shared `docker-socket` volume to the standard Docker socket path.
-        *   **`DependsOn`**: Ensures the `docker-in-docker` container is started before this one attempts to.
-    *   **`docker-in-docker`**:
-        *   **`Image: "docker:25-dind"`**: We use the official Docker image with the `-dind` (Docker-in-Docker) tag.
-        *   **`Privileged: true`**: This gives the container the elevated permissions needed to run a Docker daemon.
-        *   **`MountPoints`**: It also mounts the `docker-socket` volume, making its daemon available to other containers.
-
-With this Task Definition, you have a complete, reusable blueprint for a runner that can securely authenticate with GitHub and build Docker images.
-
-***
-
-Next, we will use this Task Definition to create an ECS Service that manages the lifecycle of our runners. What would you like to know about **Step 6: Create the ECS Service to Run and Scale the Runners**?
-
-
 ---
 
-### User
+#### **How to Deploy**
 
-since We are setting up ECS, Can we use 'DOCKER_HOST' instead of mouting socket?
+1.  **Save the Template:** Save the code above into a file named `core-infra.yml`.
+2.  **Get Secret ARN:** Go to the AWS Secrets Manager console and copy the ARN of the secret you created in Step 2.
+3.  **Deploy via AWS CLI:** Run the following command in your terminal, replacing `<YOUR_SECRET_ARN>` with the ARN you just copied.
 
+    ```bash
+    aws cloudformation deploy \
+      --template-file core-infra.yml \
+      --stack-name github-runner-core-infra \
+      --parameter-overrides SecretArn=<YOUR_SECRET_ARN> \
+      --capabilities CAPABILITY_IAM
+    ```
 
----
+    *   `--stack-name`: A unique name for your CloudFormation stack.
+    *   `--parameter-overrides`: This is where we pass the required `SecretArn`.
+    *   `--capabilities CAPABILITY_IAM`: This is required because the template creates IAM resources.
 
-### Assistant (gemini-2.5-pro)
+After a few minutes, the stack creation will complete. You will have a fully functional ECS cluster with EC2 instances ready and waiting. The instances have the correct permissions to pull the secret, and the networking is configured for them to reach the internet.
 
-<details>
-<summary>Reasoning</summary>
-
-**Exploring the Docker Connection**
-
-I'm currently focused on the user's core inquiry: whether `DOCKER_HOST` can fully replace socket mounting. My analysis now zeroes in on the practical implications of each method. I'm building a comparison to highlight the nuances and potential trade-offs. I'm diving deeper into how `DOCKER_HOST` configuration impacts Docker client-daemon communication vs. direct socket access.
-
-
-**Defining Roles of each method**
-
-Now, I'm focusing on the distinct functions of `DOCKER_HOST` and socket mounting, emphasizing their co-dependence. My thinking is progressing; I will explain why they are used together. I will use analogies to help the user understand the concepts. The analogy will compare it to a physical mail room: `DOCKER_HOST` would be the address, the shared volume will be the mailbox with the connection key. I'm aiming for clarity in explaining the 'why' behind using them together, avoiding jargon.
-
-
-**Refining the Analogy**
-
-I am now focusing on refining the analogy to clearly illustrate the combined functions of `DOCKER_HOST` and socket mounting. I will incorporate the analogy in explaining the server, the connection, and the client. I'm also ensuring the user understands why setting the `DOCKER_HOST` to the same default path is good practice, but not the only step.
-
-
-**Connecting the Dots**
-
-My thoughts now center on the necessity of both the environment variable and volume mounting for Docker client-daemon interaction. I'm building out a comparison table, illustrating the individual functions, and explaining how they work in harmony. I'm focusing on why setting `DOCKER_HOST` alone doesn't suffice without establishing a physical link between the containers. I'm thinking about the user's intent to connect two daemons, and highlighting the importance of clear communication pathways.
-
-
-**Analyzing the Core Question**
-
-I'm now fully immersed in understanding the user's core inquiry: whether the `DOCKER_HOST` alone can replace the socket mount. I see that their question comes from deeper thinking about the mechanics of container communication. I'm focusing on why a shared path is essential, drawing from the "address vs. road" analogy.
-
-
-**Understanding the Connection Path**
-
-I'm now fully immersed in understanding the user's core inquiry: whether the `DOCKER_HOST` alone can replace the socket mount. I see that their question comes from deeper thinking about the mechanics of container communication. I'm focusing on why a shared path is essential, drawing from the "address vs. road" analogy.
-
-
-
-</details>
-
-That's an excellent and insightful question. It gets to the very heart of how these two containers communicate.
-
-The short answer is: **No, you cannot use `DOCKER_HOST` *instead* of mounting the socket. You must use them together.**
-
-Let's break down why. Think of it like a physical address and the actual road leading to it.
-
-1.  **The Shared Volume Mount (`-v /var/run/docker.sock:/var/run/docker.sock`)**: This is the **physical connection**. It's the road. The DinD container *creates* the `docker.sock` file, which is a Unix socket that acts as the API endpoint for the Docker daemon. By mounting this socket into the runner container, you are making that physical endpoint accessible inside the runner. Without this mount, the runner container has no "road" to the Docker daemon; the `docker.sock` file simply doesn't exist from its perspective.
-
-2.  **The Environment Variable (`DOCKER_HOST=unix:///var/run/docker.sock`)**: This is the **address**. It tells the Docker CLI *where to look* for the Docker daemon's API endpoint.
-
-Here’s a step-by-step of what happens:
-
-1.  The **DinD sidecar** starts up. Because it's a privileged container running the Docker daemon, it creates the file `/var/run/docker.sock` inside its own filesystem.
-2.  The **shared volume** that we defined in the Task Definition (`docker-socket`) acts as a bridge. It takes that `/var/run/docker.sock` file from the DinD container and makes it visible at `/var/run/docker.sock` inside the **runner container**.
-3.  The **runner container** starts. Your workflow tells it to run a command like `docker build .`.
-4.  The Docker CLI inside the runner container checks the `DOCKER_HOST` environment variable to know where to send this command.
-5.  It sees `DOCKER_HOST=unix:///var/run/docker.sock`, so it tries to communicate with the file at that path.
-6.  Because of the volume mount, that file is the *exact same file* being served by the DinD container's daemon. The command is successfully passed to the DinD container, which executes the build.
-
-#### What Happens If You Omit One?
-
-*   **No Volume Mount, `DOCKER_HOST` set**: The Docker CLI in the runner looks for `/var/run/docker.sock`, but the file doesn't exist in its filesystem. You will get an error like: `Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?`
-*   **Volume Mount, `DOCKER_HOST` not set**: The Docker CLI will use its default path, which is also `unix:///var/run/docker.sock`. So, in many cases, this would *actually work*. However, explicitly setting `DOCKER_HOST` is a critical best practice for clarity, debugging, and ensuring your setup is robust and not reliant on default behavior.
-
-### The TCP Alternative (and why we still prefer the socket)
-
-Your question might also be inspired by another way to use `DOCKER_HOST`, which is over TCP. In that scenario:
-
-*   The DinD container would be configured to expose the Docker daemon on a TCP port, for example, `2375`.
-*   The runner container would set `DOCKER_HOST=tcp://localhost:2375`.
-*   In this case, you would **not** need the volume mount, because the communication happens over the task's internal network (`localhost`) instead of a shared file.
-
-However, for the ECS sidecar pattern, the **shared socket is the standard and recommended approach** for two main reasons:
-
-1.  **Security**: Exposing the Docker daemon over a TCP port, even on localhost, is generally considered less secure than using a Unix socket, which can be protected by standard filesystem permissions.
-2.  **Performance**: Communication via a Unix socket is more efficient and has lower overhead than a TCP network connection, even on the loopback interface.
-
-### Summary
-
-| Component | Analogy | Purpose |
-| :--- | :--- | :--- |
-| **DinD Container** | Power Plant | Creates and runs the Docker daemon service. |
-| **Shared Volume** | Power Line | Physically connects the daemon (power plant) to the runner (house). |
-| **`DOCKER_HOST` Variable** | Wall Outlet Label | Tells the Docker CLI (appliance) which outlet to use. |
-
-You need all three components for the system to work correctly. The CloudFormation template in our guide correctly configures both the shared volume and the environment variable to establish this robust connection.
+We are now ready to build the Docker container that will run on these instances. What would you like to do next?
 
 
 ---
