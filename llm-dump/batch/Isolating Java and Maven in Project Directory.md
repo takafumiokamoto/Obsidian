@@ -1,6 +1,6 @@
 # Isolating Java and Maven in Project Directory
 Created: 7/10/2025, 12:09:44 AM
-Last Updated: 7/10/2025, 1:00:47 AM
+Last Updated: 7/10/2025, 3:04:57 PM
 ---
 
 ### User
@@ -1278,6 +1278,1207 @@ Here is how you would add this recommended stack to your `pom.xml`:
 
 *   To reformat your code: `./mvnw spotless:apply`
 *   To check everything (format, style, bugs, tests): `./mvnw verify` (The plugins are hooked into the `validate` and `check` phases, which are part of the `verify` lifecycle).
+
+
+---
+
+### User
+
+How about using gradle?
+
+
+---
+
+### Assistant (gemini-2.5-pro)
+
+<details>
+<summary>Reasoning</summary>
+
+**Pinpointing Gradle Equivalents**
+
+I've been breaking down the user's request. It's about translating a `pom.xml` setup to Gradle. My focus now is on isolating the key components: Java and Maven (now Gradle) dependency management. Next, I'll be working on figuring out how to achieve that.
+
+
+**Defining the Gradle Equivalent**
+
+I'm now fully immersed in the Gradle transformation. My thinking has shifted to the structural framework for the response. I'm focusing on providing a direct comparison with the Maven conversation the user referenced. The structure will feature a high-level overview of Gradle versus Maven, followed by a detailed breakdown mirroring the previous Maven setup. I am considering the use of Toolchains as well.
+
+
+**Formulating a Logical Structure**
+
+I've outlined a structured approach for the Gradle response, mirroring the Maven conversation's logic for easy comparison. The structure will address key points: starting with a comparison of Gradle and Maven, focusing on isolating the environment using Toolchains, adding JUnit 5 for testing, and incorporating formatters and linters using Spotless, Checkstyle, and SpotBugs plugins. I intend to provide a full `build.gradle.kts` file at the end. I will keep it simple and concise.
+
+
+**Outlining the Build Script**
+
+I've been meticulously crafting the structure of the Gradle response. I'm focusing on creating a clear, direct parallel to the Maven conversation, aiding the user's understanding through direct comparisons. This involves a comprehensive overview of Gradle's advantages, an in-depth guide on Gradle Toolchains for environment isolation, and detailed instructions for incorporating JUnit 5, Spotless, Checkstyle, and SpotBugs. The goal is to culminate in a fully functional `build.gradle.kts` file. I'm excited by the idea of an at-a-glance summary table.
+
+
+**Crafting a Gradle Blueprint**
+
+I've been working on the structure of the response and have a clear path forward. I'll follow the logical progression of the original Maven conversation for easy comparison. The outline includes: a Gradle/Maven comparison, using Toolchains to isolate the environment, adding JUnit 5 for testing, and integrating formatters and linters. I'm focusing on a comprehensive `build.gradle.kts` file and summary table. I've also been studying the user's specific requirement for a project-local JDK, and how to configure that using the toolchain.
+
+
+**Building the Gradle Structure**
+
+I'm now fully immersed in the details of the Gradle conversion. My focus is on fleshing out each section to provide the most complete and accurate information for the user. I've been researching the best ways to present the key concepts, including Toolchains, local JDK configuration, and plugin implementation. I'm focusing on the `build.gradle.kts` structure and ensuring it aligns with the user's specific requirements, especially regarding the local JDK. I am thinking that the auto-provisioning is the easiest way to solve the issue.
+
+
+**Building the Build Script**
+
+I'm deep into crafting the `build.gradle.kts` file. I've focused on ensuring the key sections, including the Toolchains configuration for environment isolation and project-local JDK, are accurate and easy to understand. I'm prioritizing the presentation of the best practice (auto-provisioning) and then including a note on how to use a prepared local JDK. The Kotlin DSL syntax is finalized, and the final table is ready.
+
+
+
+</details>
+
+Excellent question. Moving the entire setup to Gradle is a very popular choice. Gradle offers a more flexible and powerful build system, using a Groovy or Kotlin DSL (Domain-Specific Language) instead of Maven's XML.
+
+Let's walk through how to achieve the exact same setup—a fully isolated, reproducible environment with testing and quality tools—using Gradle.
+
+### Gradle vs. Maven: A Quick Comparison
+
+*   **Configuration:** Gradle uses code (Groovy or Kotlin `build.gradle` files), which is more powerful and less verbose than Maven's XML (`pom.xml`).
+*   **Performance:** Gradle is generally faster due to advanced caching and an incremental build daemon that runs in the background.
+*   **Flexibility:** Gradle is highly customizable, making it easier to handle complex build logic.
+
+---
+
+### 1. Isolating the Environment (Gradle and Java)
+
+This is the core of the setup, ensuring no global tools are needed.
+
+#### Isolating Gradle: The Gradle Wrapper (`gradlew`)
+
+This is the direct equivalent of the Maven Wrapper. It's the standard, non-negotiable way to run any Gradle project. It downloads and uses the specific Gradle version defined in the project.
+
+**How to set it up:**
+If you have Gradle installed globally, you can run this once in your project root:
+
+```bash
+# Specify the Gradle version you want your project to use
+gradle wrapper --gradle-version 8.8
+```
+
+This creates the following files, which you **commit to your Git repository**:
+*   `gradlew` (Shell script for Linux/macOS)
+*   `gradlew.bat` (Batch script for Windows)
+*   `gradle/wrapper/gradle-wrapper.jar`
+*   `gradle/wrapper/gradle-wrapper.properties` (This file contains the Gradle version)
+
+From now on, everyone uses `./gradlew` instead of `gradle`.
+
+#### Isolating Java: Java Toolchains
+
+Gradle has a first-class concept called **Toolchains**, which is the modern, standard way to manage the JDK. It's even more seamless than Maven's approach.
+
+You simply declare the Java version you need in your build file, and Gradle will:
+1.  Check if a compatible JDK is already installed on the machine.
+2.  If not, it will **automatically download and cache a compatible JDK** for you.
+
+This completely removes the need for developers to install or configure Java manually.
+
+---
+
+### 2. The Complete `build.gradle.kts` File
+
+Here is a complete `build.gradle.kts` (using the modern Kotlin DSL) that sets up everything we've discussed:
+1.  Java Toolchain (isolates the JDK).
+2.  JUnit 5 for testing.
+3.  Spotless plugin with Google Java Format for formatting.
+4.  Checkstyle and SpotBugs plugins for linting and bug detection.
+
+Place this file in the root of your project.
+
+```kotlin
+// build.gradle.kts
+
+// 1. PLUGINS: Apply plugins for Java, Checkstyle, SpotBugs, and Spotless
+plugins {
+  // Core Java application support
+  `java-library`
+
+  // Checkstyle plugin for code style rules
+  checkstyle
+
+  // SpotBugs plugin for finding potential bugs
+  id("com.github.spotbugs") version "6.0.8"
+
+  // Spotless plugin for code formatting
+  id("com.diffplug.spotless") version "6.25.0"
+}
+
+// General project information
+group = "com.mycompany.app"
+version = "1.0-SNAPSHOT"
+
+// Configure the Java repository (Maven Central)
+repositories {
+  mavenCentral()
+}
+
+// 2. JAVA TOOLCHAIN: This isolates the JDK for the project
+java {
+  toolchain {
+    // Gradle will automatically find or download JDK 17
+    languageVersion.set(JavaLanguageVersion.of(17))
+  }
+}
+
+// 3. DEPENDENCIES: Add JUnit 5 for testing
+dependencies {
+  // 'testImplementation' is the equivalent of Maven's <scope>test</scope>
+  testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+  testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+}
+
+// Configure the testing framework to use JUnit 5
+tasks.withType<Test> {
+  useJUnitPlatform()
+}
+
+// 4. CODE QUALITY TOOLS CONFIGURATION
+
+// Configure Spotless to use Google Java Format
+spotless {
+  java {
+    googleJavaFormat("1.17.0").style("GOOGLE")
+  }
+}
+
+// Configure Checkstyle
+checkstyle {
+  toolVersion = "10.17.0"
+  // Assumes you have google_checks.xml in config/checkstyle/
+  config = resources.text.fromFile("config/checkstyle/google_checks.xml")
+}
+
+// Configure SpotBugs
+spotbugs {
+  toolVersion.set("4.8.3")
+}
+
+// Make the 'check' task depend on quality tools
+tasks.named("check") {
+  dependsOn(tasks.named("spotlessCheck"), tasks.named("checkstyleMain"), tasks.named("spotbugsMain"))
+}
+```
+
+**Note on using a prepared, local JDK:**
+While Gradle's auto-download is the recommended approach, if you *must* use a JDK bundled with your project (e.g., in a `.jdk/` folder), you can configure your toolchain to use it by setting the `JAVA_HOME` environment variable before running Gradle, just like in the Maven script-based solution. The `build.sh`/`build.cmd` wrapper script approach remains a simple and effective way to handle this.
+
+---
+
+### 3. How to Use It (Common Commands)
+
+You run all commands from your project root using the Gradle Wrapper.
+
+*   **Build the project (compile, test, and run quality checks):**
+    ```bash
+    ./gradlew build
+    ```
+    The `build` task automatically runs `check` and `test`.
+
+*   **Run only the tests:**
+    ```bash
+    ./gradlew test
+    ```
+
+*   **Automatically format your code:**
+    ```bash
+    ./gradlew spotlessApply
+    ```
+
+*   **Check if the code is formatted correctly (for CI/CD):**
+    ```bash
+    ./gradlew spotlessCheck
+    ```
+
+*   **Clean the project:**
+    ```bash
+    ./gradlew clean
+    ```
+
+This Gradle setup provides a modern, efficient, and fully reproducible build environment that meets all the requirements you've outlined.
+
+
+---
+
+### User
+
+How Can I set proxy for Gradle?
+
+
+---
+
+### Assistant (gemini-2.5-pro)
+
+<details>
+<summary>Reasoning</summary>
+
+**Defining the User's Intent**
+
+My initial thought is the user's focus. I'm focusing on their direct need – to configure a proxy within Gradle. It aligns perfectly with prior discussions on Maven proxies, making the transition logical. I understand the user's aim to find the equivalent Gradle solution.
+
+
+**Outlining Gradle Configuration**
+
+I'm now zeroing in on Gradle's configuration methods. Key differences from Maven are emerging. I'm focusing on user-level properties via the `gradle.properties` file as the ideal entry point. Considering different scopes and structuring the answer in an organized way. The goal is a clear, concise guide to proxy settings for the user.
+
+
+**Elaborating on the Approach**
+
+I'm now fully immersed in Gradle's structure. My focus is expanding from just the user-level file. I'm carefully evaluating and adding project-level configurations for completeness, even if they're less common. I will discuss the nuances of using proxy configurations within a specific build.gradle, focusing on its appropriateness. I'm considering scenarios, adding a robust, helpful guide.
+
+
+**Organizing Proxy Solutions**
+
+My thoughts have now shifted to the practical application of the research. I'm focusing on crafting a structured and comprehensive answer that addresses the user's need. I'm prioritizing the user's experience by offering the most effective configuration method first, then addressing edge cases and providing clear recommendations.
+
+
+**Refining Configuration Details**
+
+My thoughts have now shifted to the finer points of proxy configuration. I'm focusing on providing the user with practical examples and helpful explanations. I'm expanding my approach, now that I have a structure, to cover different systems and scenarios.  I'm making sure to cover all the significant details. I aim to ensure clarity by including comments within the code blocks, to provide even more clarity.
+
+
+
+</details>
+
+Of course. Setting a proxy for Gradle is a critical step for anyone in a corporate or secured network environment. Gradle, like Maven, needs to download dependencies, plugins, and even the Gradle distribution itself, so it must be configured to work with your proxy.
+
+The process is similar to Maven's but uses a different file: `gradle.properties`.
+
+### The Standard Method: `gradle.properties` in Your User Home Directory
+
+This is the best and most common way to configure a proxy. It keeps your personal settings, including potential credentials, separate from your project's source code.
+
+1.  **Locate or Create the `gradle.properties` file:**
+    *   **Linux/macOS:** `~/.gradle/gradle.properties`
+    *   **Windows:** `C:\Users\YourUser\.gradle\gradle.properties`
+
+    If the `.gradle` directory or the `gradle.properties` file doesn't exist, simply create them.
+
+2.  **Add Proxy Settings to the File:**
+    Open the file and add the following lines, adjusting the values for your specific proxy server.
+
+    ```properties
+    # --- Gradle Proxy Settings ---
+
+    # These properties are used by the Gradle Daemon JVM.
+    # For HTTP traffic
+    systemProp.http.proxyHost=proxy.mycompany.com
+    systemProp.http.proxyPort=8080
+    systemProp.http.proxyUser=your-proxy-username
+    systemProp.http.proxyPassword=your-proxy-password
+    systemProp.http.nonProxyHosts=*.mycompany.internal|localhost|127.0.0.1
+
+    # For HTTPS traffic
+    systemProp.https.proxyHost=proxy.mycompany.com
+    systemProp.https.proxyPort=8080
+    systemProp.https.proxyUser=your-proxy-username
+    systemProp.https.proxyPassword=your-proxy-password
+    systemProp.https.nonProxyHosts=*.mycompany.internal|localhost|127.0.0.1
+    ```
+
+**Key Points:**
+
+*   **`systemProp.` prefix:** This prefix tells Gradle to set these as standard Java System Properties for the JVM that runs the build.
+*   **Username/Password:** If your proxy doesn't require authentication, you can omit the `proxyUser` and `proxyPassword` lines.
+*   **`nonProxyHosts`:** This is a crucial setting. It's a pipe-separated (`|`) list of hosts that Gradle should connect to directly, bypassing the proxy. Always include `localhost` and `127.0.0.1`.
+*   **Security:** Since this file may contain credentials, it should **never** be shared or committed to source control. Its location in your user home directory keeps it safe.
+
+Once you save this file, any time you run `./gradlew`, it will automatically use these settings.
+
+### The "Chicken-and-Egg" Problem: Proxy for the Wrapper Itself
+
+Just like with Maven, you might be on a new machine where the Gradle distribution itself hasn't been downloaded yet. The initial script that downloads the `gradle-x.x-bin.zip` file might not read the `gradle.properties` file.
+
+In this case, you need to pass the proxy settings to the wrapper's JVM using an environment variable.
+
+**Solution: Use the `GRADLE_OPTS` Environment Variable**
+
+This is the equivalent of `MAVEN_OPTS`.
+
+**On Linux/macOS:**
+
+```bash
+export GRADLE_OPTS="-Dhttp.proxyHost=proxy.mycompany.com -Dhttp.proxyPort=8080 -Dhttps.proxyHost=proxy.mycompany.com -Dhttps.proxyPort=8080"
+
+# Now run the wrapper. It will use these settings to download Gradle itself.
+./gradlew --version
+```
+
+**On Windows (Command Prompt):**
+
+```batch
+set GRADLE_OPTS="-Dhttp.proxyHost=proxy.mycompany.com -Dhttp.proxyPort=8080 -Dhttps.proxyHost=proxy.mycompany.com -Dhttps.proxyPort=8080"
+
+# Now run the wrapper
+gradlew.bat --version
+```
+
+You typically only need to do this once per machine to get the initial Gradle distribution downloaded. After that, the `gradle.properties` file is usually sufficient.
+
+### Other Methods (Less Common)
+
+*   **Project-Specific `gradle.properties`:** You can place a `gradle.properties` file in the root of your project. Gradle will load these properties, too. **WARNING:** This is very risky if you include credentials, as it's easy to accidentally commit the file to Git. This method is generally only used for non-sensitive, project-wide settings or on CI/CD servers where the file is injected securely at build time.
+
+*   **Command Line Arguments:** You can pass properties directly on the command line, but this is tedious for daily use.
+    ```bash
+    ./gradlew -Dhttp.proxyHost=... build
+    ```
+
+### Summary and Recommendation
+
+| Method | Location | When to Use | Security |
+| :--- | :--- | :--- | :--- |
+| **User `gradle.properties`** | `~/.gradle/gradle.properties` | **Recommended for daily use.** Set it once on your machine for all projects. | **Excellent.** Keeps credentials private and out of source control. |
+| **`GRADLE_OPTS` Env Var** | Your shell environment | For the very first run of the wrapper if it can't download Gradle. | **Good.** Environment variables are generally secure on a local machine. |
+| **Project `gradle.properties`** | `[Project Root]/gradle.properties` | For project-specific, non-sensitive settings. Or for CI servers. | **Risky.** High chance of committing credentials. **Avoid for proxy settings.** |
+
+**Recommended Workflow:**
+
+1.  **Configure `~/.gradle/gradle.properties`** on your local machine. This is the primary, set-and-forget solution.
+2.  If you run `./gradlew` on a fresh machine and it fails to download the distribution, **use `GRADLE_OPTS` once** to get it downloaded.
+3.  For CI/CD pipelines, use environment variables or the platform's secret management to inject these properties at build time.
+
+
+---
+
+### User
+
+could you help me set up my project with gradle?
+I installed gradle and Java in my machine.
+What command should I next?
+maybe 'gradle init'?
+
+
+---
+
+### Assistant (gemini-2.5-pro)
+
+<details>
+<summary>Reasoning</summary>
+
+**Outlining the Scope**
+
+I'm starting by dissecting the user's request. My current focus is to pinpoint the exact goal – setting up a new Gradle project. I've also noted their existing environment: Gradle and Java are already globally installed. This is key to tailoring the guide. Finally, I'm identifying the fundamental user question at the heart of this.
+
+
+**Confirming and Elaborating**
+
+I agree, `gradle init` is the appropriate starting point. Now I need to explain the rationale behind that command. It's a scaffolding tool designed to create the fundamental project structure. I'm focusing on why it's the right choice for the user's specific context, highlighting its role as the initial step in project setup.
+
+
+**Constructing the Steps**
+
+Now I'm diving deeper into the guide's structure. I'm focusing on those critical 'Customization' steps. This means detailing how to modify the generated `build.gradle.kts` file. I'll need to clearly explain adding the relevant plugins for toolchains, testing, and static analysis (Checkstyle, SpotBugs, and Spotless).  I'm also preparing to show a simple example, making sure it aligns with earlier best-practice conversations.
+
+
+**Elaborating the Structure**
+
+Now, I'm focusing on the guide's third step: modifying the `build.gradle.kts` file. I'll showcase clear examples, contrasting the initial generated version with the enhanced, best-practice-compliant version. The aim is to ensure the user can seamlessly integrate toolchains, testing, and static analysis into their project. I need to make sure the instructions are easy to follow!
+
+
+**Developing the Detailed Steps**
+
+I'm now detailing the individual steps within the guide. First, I'll provide clear instructions for running `gradle init`, including the suggested answers to prompts. Then, a visualization will describe the generated file structure. Step three will be the crux, detailing the modifications to `build.gradle.kts`. This will include adding plugins, toolchain configuration, code quality setups (Spotless, Checkstyle, SpotBugs), and task dependencies. I'll provide the complete, annotated `build.gradle.kts` file as a user-friendly starting point. I'll also clarify the required `google_checks.xml` file.
+
+
+**Crafting a Concise Guide**
+
+I'm focused on the guide's clarity. I'm tailoring the language for an expert, using a step-by-step approach. I will clearly articulate running `gradle init`, file structure, and modifying the `build.gradle.kts`. This will include plugins, toolchains, code quality tools, and the necessary configurations. I'm prioritizing user-friendliness!
+
+
+**Developing a Detailed Plan**
+
+I'm solidifying the guide's structure. My focus is on providing clear, actionable steps for the user. I'll make the guide easy to follow. I will detail `gradle init` and file structure visualization. The core will be modifying `build.gradle.kts`. This will include the plugins, toolchain setup, and code quality configurations (Spotless, Checkstyle, SpotBugs), along with task dependencies.
+
+
+
+</details>
+
+You are exactly right! The `gradle init` command is the perfect next step. It's a powerful, built-in tool that scaffolds a new project for you with all the necessary files and directories.
+
+Since you have Gradle and Java installed globally, you can use them to bootstrap the project. The beauty of the process is that once it's done, your project will use the **Gradle Wrapper (`gradlew`)** and **Java Toolchains**, making the global installations irrelevant for anyone else who works on the project.
+
+Let's walk through it step-by-step.
+
+### Step 1: Initialize the Project with `gradle init`
+
+1.  Open your terminal or command prompt.
+2.  Create a new directory for your project and navigate into it.
+    ```bash
+    mkdir my-new-project
+    cd my-new-project
+    ```
+3.  Run the interactive `gradle init` command.
+    ```bash
+    gradle init
+    ```
+
+Gradle will ask you a series of questions. Here are the recommended answers to create a standard Java application with the best practices we've discussed:
+
+```
+Select type of project to generate:
+  1: basic
+  2: application  <-- Choose this
+  3: library
+  4: Gradle plugin
+Enter selection (default: basic) [1..4] 2
+
+Select implementation language:
+  1: C++
+  2: Groovy
+  3: Java         <-- Choose this
+  4: Kotlin
+  5: Scala
+  6: Swift
+Enter selection (default: Java) [1..6] 3
+
+Split functionality across multiple subprojects?:
+  1: no, single application project  <-- Choose this for simplicity
+  2: yes, application and library projects
+Enter selection (default: no, single application project) [1..2] 1
+
+Select build script DSL:
+  1: Groovy
+  2: Kotlin       <-- Choose this (modern standard)
+Enter selection (default: Kotlin) [1..2] 2
+
+Select test framework:
+  1: JUnit 4
+  2: TestNG
+  3: Spock
+  4: JUnit Jupiter <-- Choose this (for JUnit 5)
+Enter selection (default: JUnit Jupiter) [1..4] 4
+
+Project name (default: my-new-project):
+Enter project name (default: my-new-project):
+Source package (default: my.new.project): com.mycompany.app
+Enter source package (default: com.mycompany.app):
+
+> Task :init
+Get more help with your project: https://docs.gradle.org/8.8/userguide/building_java_applications.html
+
+BUILD SUCCESSFUL
+```
+
+### Step 2: Understand the Generated Structure
+
+You now have a complete, runnable Gradle project. The key files are:
+
+```
+my-new-project/
+├── gradle/
+│   └── wrapper/              <-- The Gradle Wrapper files
+├── gradlew                   <-- The wrapper script for Linux/macOS
+├── gradlew.bat               <-- The wrapper script for Windows
+├── build.gradle.kts          <-- YOUR MAIN BUILD SCRIPT
+├── settings.gradle.kts       <-- Defines project name and modules
+└── src/
+    ├── main/
+    │   └── java/com/mycompany/app/App.java  <-- Your app code
+    └── test/
+        └── java/com/mycompany/app/AppTest.java <-- Your test code
+```
+
+From this moment on, you should **only use `./gradlew`**, not your global `gradle` command.
+
+### Step 3: Enhance Your `build.gradle.kts`
+
+Now, let's edit the `build.gradle.kts` file to add the Java Toolchain, formatter, and linters we discussed.
+
+Open `build.gradle.kts` and replace its contents with this complete, enhanced version:
+
+```kotlin
+// build.gradle.kts
+
+// Apply plugins for Java, Checkstyle, SpotBugs, and Spotless
+plugins {
+    // 'application' includes the 'java' plugin and adds tasks for running the app
+    application
+
+    // Checkstyle plugin for code style rules
+    checkstyle
+
+    // SpotBugs plugin for finding potential bugs
+    id("com.github.spotbugs") version "6.0.8"
+
+    // Spotless plugin for code formatting
+    id("com.diffplug.spotless") version "6.25.0"
+}
+
+// General project information
+group = "com.mycompany.app"
+version = "1.0-SNAPSHOT"
+
+// Configure the Java repository (Maven Central)
+repositories {
+    mavenCentral()
+}
+
+// --- KEY BEST PRACTICES ---
+
+// 1. JAVA TOOLCHAIN: This isolates the JDK for the project
+java {
+    toolchain {
+        // Gradle will automatically find or download JDK 17
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+// 2. DEPENDENCIES: JUnit 5 is already configured by `gradle init`
+dependencies {
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    implementation(libs.guava)
+}
+
+// 3. APPLICATION: Define the main class for the `run` task
+application {
+    mainClass.set("com.mycompany.app.App")
+}
+
+// 4. TESTING: Configure the test task to use JUnit 5
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
+// 5. CODE QUALITY TOOLS CONFIGURATION
+
+// Configure Spotless to use Google Java Format
+spotless {
+    java {
+        // This applies the Google Java Format standard
+        googleJavaFormat("1.17.0").style("GOOGLE")
+    }
+}
+
+// Configure Checkstyle
+checkstyle {
+    toolVersion = "10.17.0"
+    // This points to a standard Google Checkstyle config file
+    // You will need to create this file in the next step.
+    config = resources.text.fromFile("config/checkstyle/google_checks.xml")
+}
+
+// Configure SpotBugs
+spotbugs {
+    toolVersion.set("4.8.3")
+}
+
+// Make the 'check' task depend on our quality tools
+tasks.named("check") {
+    dependsOn(tasks.named("spotlessCheck"), tasks.named("checkstyleMain"), tasks.named("spotbugsMain"))
+}
+```
+*Note: `gradle init` now creates a `gradle/libs.versions.toml` file for dependency management. The `libs.junit.jupiter` and `libs.guava` are aliases defined in that file. This is a great modern practice!*
+
+### Step 4: Add the Checkstyle Configuration File
+
+The configuration above refers to a file `config/checkstyle/google_checks.xml`. You need to create it.
+
+1.  Create the directories:
+    ```bash
+    mkdir -p config/checkstyle
+    ```
+2.  Download the official Google Checkstyle configuration file.
+    ```bash
+    # On Linux/macOS using curl
+    curl -o config/checkstyle/google_checks.xml https://raw.githubusercontent.com/checkstyle/checkstyle/master/src/main/resources/google_checks.xml
+    ```
+    If you're on Windows, you can download that URL with your browser and save it to `config/checkstyle/google_checks.xml`.
+
+### Step 5: You're All Set! Run Your First Build
+
+Now you have a fully configured, modern, and self-contained Java project. Use the Gradle Wrapper (`./gradlew`) for all commands:
+
+*   **To build everything (compile, test, and run all quality checks):**
+    ```bash
+    ./gradlew build
+    ```
+
+*   **To automatically reformat all your Java code:**
+    ```bash
+    ./gradlew spotlessApply
+    ```
+
+*   **To run your application:**
+    ```bash
+    ./gradlew run
+    ```
+
+*   **To clean all build outputs:**
+    ```bash
+    ./gradlew clean
+    ```
+
+You have successfully set up a project that anyone can clone and build with a single command, regardless of what version of Java or Gradle they have installed globally.
+
+
+---
+
+### User
+
+I am going to upload my project to lambda.
+Should I choose 2: application In this situation?
+
+
+---
+
+### Assistant (gemini-2.5-pro)
+
+<details>
+<summary>Reasoning</summary>
+
+**Defining Project Scope**
+
+I've started by deconstructing the user's inquiry, focusing on the core task of deploying a Java project to AWS Lambda. The specific point of confusion is whether to select "application" or "library" during `gradle init`. My initial thoughts are on identifying the project's primary purpose.
+
+
+**Unpacking the Lambda Conundrum**
+
+I'm now zeroing in on the practical implications of selecting "library." It seems the key advantage lies in how Gradle treats the resulting artifact. A "library" project creates a JAR that can be easily included as a dependency in other Lambda deployment configurations. I'm exploring how this modular approach aligns with recommended best practices for Lambda functions and how it impacts build and deployment processes.
+
+
+**Outlining Deployment Workflow**
+
+I'm now exploring the details of the deployment process after opting for a "library" project. My thoughts are shifting towards streamlining the build, packaging, and upload steps required to get the Java code running on AWS Lambda. I'm focusing on crafting a concise and actionable guide, providing practical instructions and addressing potential hurdles for the user.
+
+
+**Clarifying the Deployment Focus**
+
+I'm now deep-diving into the 'how-to' aspect of the solution. My approach is to construct a practical guide, which will cover the initial setup with the 'library' choice,  the best dependencies, and the creation of a "fat JAR." I'm carefully outlining each step for a seamless user experience, emphasizing the crucial details to build a functional Lambda function.
+
+
+**Refining the Gradle Approach**
+
+I've shifted my focus to outlining the practical steps for a library-based Lambda project. My thoughts now encompass the specifics of the `build.gradle.kts` configuration, including essential dependencies like `aws-lambda-java-core`, and how the Shadow plugin enables a "fat JAR." I'm also considering creating a comparative table of "application" and "library" approaches, for clearer comprehension of the solution.
+
+
+**Defining the Gradle Setup**
+
+I'm now outlining the steps to configure the `build.gradle.kts` file, focusing on essential dependencies for Lambda projects, like `aws-lambda-java-core`, and implementing the Shadow plugin for creating "fat JARs." The goal is to provide a complete, copy-and-paste-ready example. I'm also considering a comparison table to clarify the "application" versus "library" options.
+
+
+
+</details>
+
+That's a fantastic and very important question. The choice here has a significant impact on how you build and package your project for AWS Lambda.
+
+For an AWS Lambda function, the recommended and most common choice is **3: library**, not `2: application`.
+
+Here’s the detailed explanation why.
+
+### Why "Library" is the Correct Choice for Lambda
+
+The key is to understand the **Lambda Execution Model**.
+
+*   An **Application** (`application` plugin) is a standalone program that you run directly. It has a `public static void main(String[] args)` method that serves as its entry point. The `application` plugin in Gradle is designed to create a runnable JAR and a `run` task for this purpose.
+*   A **Lambda Function** is not a standalone program. It's a piece of code packaged as a JAR file that is loaded and executed by the AWS Lambda runtime environment. The Lambda runtime is the *actual* application. It loads your JAR (your **library**) and invokes a specific *handler method* that you define (e.g., `public APIGatewayProxyResponseEvent handleRequest(...)`). Your code doesn't have a `main` method that gets called.
+
+Therefore, from Gradle's perspective, you are building a **library** of code that will be used by another application (the AWS Lambda service).
+
+### What You Need to Build for Lambda
+
+For Lambda, you need to produce a single `.jar` file that contains:
+1.  Your compiled Java classes.
+2.  All of your project's dependencies (like `aws-lambda-java-core`).
+
+This is often called a **"fat JAR"** or **"uber JAR"**. The standard `java-library` plugin doesn't create this by default. You need an additional plugin to assemble it. The industry standard for this in Gradle is the **Shadow JAR Plugin**.
+
+### Step-by-Step Guide to Setting Up a Lambda Project
+
+Here is the complete, recommended process.
+
+#### Step 1: Run `gradle init` with the Correct Choices
+
+```bash
+# In your empty project directory
+gradle init
+```
+
+*   Select type of project: **3: library**
+*   Select implementation language: **3: Java**
+*   Select build script DSL: **2: Kotlin**
+*   Select test framework: **4: JUnit Jupiter**
+*   Project name: `my-lambda-function`
+*   Source package: `com.mycompany.lambda`
+
+#### Step 2: Create Your Lambda Handler Class
+
+Gradle will generate a `Library.java` file. You can delete it and create your handler class.
+
+**File: `src/main/java/com/mycompany/lambda/App.java`**
+```java
+package com.mycompany.lambda;
+
+import com.amazonaws.services.lambda.runtime.Context;
+import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyRequestEvent;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+import java.util.Collections;
+
+/**
+ * Handler for requests to Lambda function.
+ */
+public class App implements RequestHandler<APIGatewayProxyRequestEvent, APIGatewayProxyResponseEvent> {
+
+    @Override
+    public APIGatewayProxyResponseEvent handleRequest(APIGatewayProxyRequestEvent input, Context context) {
+        APIGatewayProxyResponseEvent response = new APIGatewayProxyResponseEvent();
+        response.setStatusCode(200);
+        response.setHeaders(Collections.singletonMap("Content-Type", "application/json"));
+        response.setBody("{\"message\": \"Hello from Lambda!\"}");
+        return response;
+    }
+}
+```
+
+#### Step 3: Configure Your `build.gradle.kts` for Lambda
+
+This is the most important step. You need to add the Lambda dependencies and the Shadow JAR plugin.
+
+Replace the contents of your `build.gradle.kts` with this:
+
+```kotlin
+// build.gradle.kts
+
+// Apply plugins for Java, and the Shadow JAR plugin for packaging
+plugins {
+    `java-library`
+    id("com.github.johnrengelman.shadow") version "8.1.1" // For creating the "fat JAR"
+}
+
+group = "com.mycompany.lambda"
+version = "1.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+}
+
+// Set the Java version for the project
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+// Add dependencies for AWS Lambda and JUnit
+dependencies {
+    // AWS Lambda dependencies
+    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+    implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
+
+    // JUnit 5 for testing
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+}
+
+// Configure the test task to use JUnit 5
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
+// Configure the Shadow JAR plugin to create the final artifact
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
+    // Set a unique name for the fat JAR to avoid confusion
+    archiveClassifier.set("lambda-all")
+}
+```
+
+#### Step 4: Build Your Lambda Package
+
+Now, run the build. The `shadowJar` task will be executed as part of the `build` lifecycle.
+
+```bash
+./gradlew build
+```
+
+After the build succeeds, look inside the `build/libs` directory. You will find two JAR files:
+*   `my-lambda-function-1.0-SNAPSHOT.jar` (A thin JAR with only your code)
+*   **`my-lambda-function-1.0-SNAPSHOT-lambda-all.jar`** (The fat JAR with your code AND all dependencies)
+
+**This `-lambda-all.jar` file is the one you upload to AWS Lambda.**
+
+When you configure your function in the AWS console, you will set the handler to:
+`com.mycompany.lambda.App::handleRequest`
+
+
+---
+
+### User
+
+How Can I run this application ?
+Can I just out put hello-world in console?
+
+
+---
+
+### Assistant (gemini-2.5-pro)
+
+<details>
+<summary>Reasoning</summary>
+
+**Understanding the User's Problem**
+
+I'm initially analyzing the user's core problem, which involves setting up an AWS Lambda project and dealing with its non-runnable nature. The current focus is on understanding their confusion about libraries versus applications in the context of Lambda. The user's query about the runnable nature of a lambda, will be used to explore how the lambda works in practice. I aim to identify the specific hurdles they are facing.
+
+
+**Investigating Local Execution**
+
+I'm now investigating local Lambda execution. The core challenge is the discrepancy between the "library" designation and the need for a runnable application during development. The plan involves exploring a "Simple Main Method" approach to directly address the user's need for a local feedback loop. I believe this will provide a straightforward way to simulate the Lambda environment and allow for easy testing without constant deployment.
+
+
+**Devising a Local Run Solution**
+
+I'm now zeroing in on a "Simple Main Method" solution.  The "unit test" approach is recognized as helpful for logic testing, but doesn't feel like running the application.  I'm also considering the "AWS SAM CLI" for more in-depth environment simulation.  I plan to acknowledge the user's initial question directly.
+
+
+**Refining the Local Runner**
+
+I'm now zeroing in on detailing the "Simple Main Method" solution. My focus is on clear, step-by-step instructions for the user. I'll emphasize creating a separate `LocalRunner.java` class in the `main` source set. I plan to provide example code, including mock input objects for the `handleRequest` method. The main goal is to make local testing as straightforward as possible, addressing the user's need for a familiar run experience. The AWS SAM CLI will be included, but only as a more complex alternative.
+
+
+**Detailing Local Testing**
+
+I'm now detailing the "Simple Main Method" solution for local testing. It'll include clear, step-by-step instructions with a focus on ease of use. I plan to use mock input objects, keeping the code as simple as possible. The `build.gradle.kts` modifications will also be included to ensure the user can run this method directly. The emphasis is on making local testing feel like a direct, runnable application. The AWS SAM CLI method will be mentioned as a more comprehensive alternative.
+
+
+**Devising the Implementation Steps**
+
+I've been planning the local testing solution, specifically the "Simple Main Method". The answer will be structured in a way that starts simple, and then builds to the advanced (SAM). The detailed steps for local runner implementation will include code snippets, the necessary `build.gradle.kts` modifications, and clear console output instructions. The emphasis is on ease of setup and immediate utility. This should get the user the basic "hello world" output they desire. The AWS SAM CLI method will be included as a more comprehensive but more complex solution.
+
+
+**Crafting a Detailed Response**
+
+I've been planning the solution. I'll present the "Simple Main Method" as the primary solution, with step-by-step guidance. I'll include example code with mock objects, and explain the necessary `build.gradle.kts` modifications. The AWS SAM CLI will be included as an alternative for more complex scenarios. I want to ensure a clear and user-friendly answer.
+
+
+
+</details>
+
+Yes, absolutely! This is a critical part of the development workflow. Even though the final artifact is a "library" for Lambda, you need a way to run and test it locally without deploying to AWS every time.
+
+The answer is to **create a simple local runner with a `main` method**. This class will only be used for local development and won't be part of the Lambda package. It will simulate the Lambda environment by creating an instance of your handler and calling it.
+
+Here’s how to set it up to get "Hello from Lambda!" printed in your console.
+
+### Step 1: Create a `LocalRunner` Class
+
+Create a new Java class inside your main source folder. This class will contain the `main` method.
+
+**File: `src/main/java/com/mycompany/lambda/LocalRunner.java`**
+```java
+package com.mycompany.lambda;
+
+import com.amazonaws.services.lambda.runtime.events.APIGatewayProxyResponseEvent;
+
+/**
+ * A class to run the Lambda function locally for simple testing.
+ */
+public class LocalRunner {
+
+    public static void main(String[] args) {
+        System.out.println("--- Running Lambda Handler Locally ---");
+
+        // 1. Instantiate our handler
+        App lambdaHandler = new App();
+
+        // 2. For a simple test, we can pass null for the input and context.
+        // In a real test, you would create mock objects here.
+        APIGatewayProxyResponseEvent response = lambdaHandler.handleRequest(null, null);
+
+        // 3. Print the output to the console
+        System.out.println("Status Code: " + response.getStatusCode());
+        System.out.println("Body: " + response.getBody());
+
+        System.out.println("--- Local Run Finished ---");
+    }
+}
+```
+*   **What this does:** It acts as a mini-harness for your Lambda handler. It creates an instance of `App`, calls the `handleRequest` method (just like AWS would), and then prints the result to your console.
+
+### Step 2: Update `build.gradle.kts` to Run It
+
+Now, we need to tell Gradle how to run this `main` method. We do this by adding the `application` plugin and specifying our `LocalRunner` class as the entry point.
+
+Your `build.gradle.kts` should be updated to look like this:
+
+```kotlin
+// build.gradle.kts
+
+plugins {
+    // Add the 'application' plugin to enable the 'run' task
+    application
+    `java-library`
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+}
+
+group = "com.mycompany.lambda"
+version = "1.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
+// --- THIS IS THE NEW PART ---
+// Configure the application plugin to use our LocalRunner
+application {
+    mainClass.set("com.mycompany.lambda.LocalRunner")
+}
+// ---------------------------
+
+dependencies {
+    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+    implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
+}
+
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
+    archiveClassifier.set("lambda-all")
+}
+```
+*   **Key Change:** We added the `application` plugin and an `application { ... }` block to tell Gradle's `run` task which `main` method to execute.
+
+### Step 3: Run Your Application Locally
+
+Now you can use the standard Gradle `run` command:
+
+```bash
+./gradlew run
+```
+
+You will see the following output directly in your console:
+
+```
+> Task :run
+--- Running Lambda Handler Locally ---
+Status Code: 200
+Body: {"message": "Hello from Lambda!"}
+--- Local Run Finished ---
+
+BUILD SUCCESSFUL in 2s
+```
+
+### Summary: The Best of Both Worlds
+
+With this setup, you have achieved two separate goals with one project:
+
+1.  **`./gradlew build`**: This command produces the `my-lambda-function-1.0-SNAPSHOT-lambda-all.jar` file in `build/libs/`, which is perfectly packaged for **uploading to AWS Lambda**.
+2.  **`./gradlew run`**: This command gives you a fast, simple way to **run and debug your function locally**, printing the output directly to your console.
+
+
+---
+
+### User
+
+Let's back to specify JDK we were discussed.
+In your solution, I have to wrap gradle command with script.
+But gradle has task runner, therefore I would like to use this feature to work around more 'native-way'
+
+
+---
+
+### Assistant (gemini-2.5-pro)
+
+<details>
+<summary>Reasoning</summary>
+
+**Examining the Core Goal**
+
+I've been analyzing the user's need to leverage a project-local JDK without resorting to a wrapper script. Currently, I'm leaning towards directly configuring the `java.home` property within Gradle. However, I'm still weighing the best approach for cross-platform compatibility and maintainability. My key focus remains on providing a concise, Gradle-centric solution that aligns with the user's constraints.
+
+
+**Defining the Detection Strategy**
+
+I'm now investigating how to guide `java.toolchain` to detect the project-local JDK within the `.jdk/` directory. I'm considering using Gradle's `FileCollection` with `find { }` to locate the `java` executable. My concern is ensuring this approach gracefully handles cases where the JDK isn't present, potentially offering a helpful error message. Also, I need to account for Windows and Linux differences in file paths.
+
+
+**Formulating a Gradle Configuration**
+
+I'm now putting together the specific `build.gradle.kts` configuration using `java.toolchain`. My focus is on dynamically setting the `java.home` based on the existence of the project-local JDK directory. The plan is to use a `FileCollection` to check for `.jdk/` and then adjust the toolchain accordingly. I must ensure this doesn't lead to issues with conflicting JDKs that the build might know about. Error messaging is also at the forefront of my mind, as is making sure the file paths are correctly generated for both Windows and Linux.
+
+
+**Crafting the Configuration**
+
+I'm currently crafting a `build.gradle.kts` solution to configure the `java.toolchain` to detect a project-local JDK within the `.jdk/` directory. My focus is on dynamically setting the `java.home` based on the existence of the directory. I plan to use a `FileCollection` to check for `.jdk/` and then adjust the toolchain accordingly, which will handle edge cases. I'm also ensuring the paths are generated correctly for both Windows and Linux, while not creating conflicting JDKs. I also want to make sure the error messages will be helpful.
+
+
+**Formulating a Strategy**
+
+I'm now carefully developing a Gradle configuration strategy. The goal is to leverage Gradle's  `java.toolchain` to find the project-local JDK within the `.jdk/` directory. I'm focusing on defining a `FileCollection` for this purpose, which will be cross-platform compatible. I must also consider error handling for cases where the project-local JDK is not found and make sure the error messages are helpful.
+
+I'm considering how to ensure that my Gradle configuration effectively supports both Windows and Linux environments, preventing conflicts or incorrect assumptions.
+
+
+**Defining the Gradle Setup**
+
+I've made progress in crafting a Gradle configuration using `java.toolchain`. I aim to automatically detect the project-local JDK within the `.jdk/` directory. Currently, I'm working on the logic to dynamically set `java.home` based on the JDK's presence. I must ensure this configuration is robust and doesn't lead to conflicting JDK selections or error messages. Ensuring cross-platform compatibility remains a priority, and I need to account for differences in path structures.
+
+
+**Designing a Gradle Solution**
+
+I'm presently developing a Gradle configuration that centers around dynamically configuring the `java.toolchain` to utilize a project-specific JDK within a `.jdk/` directory. My focus is ensuring cross-platform compatibility and efficient error handling. I'm keen to generate a solution that integrates smoothly with Gradle.
+
+I've refined my approach and am working on crafting the logic within `build.gradle.kts`. This will set `java.home` based on whether the local JDK directory exists. I'm taking care to construct platform-specific paths to address Windows and Linux differences, while also addressing conflicting JDK issues and informative error messages.
+
+
+I've now finalized a Gradle configuration, using `java.toolchain`, which detects and uses a project-local JDK within the `.jdk/` directory. My focus now is writing robust error messages and ensuring the configuration works flawlessly across Windows and Linux. I've also incorporated the option for the project user to switch between JDKs within `.jdk/`.
+
+
+
+</details>
+
+You've hit on a sophisticated and excellent point. You are absolutely right to want a solution that feels native to Gradle and leverages its powerful configuration model, rather than relying on an external script. This is a hallmark of advanced Gradle usage.
+
+It is absolutely possible to achieve this. The "native way" in Gradle involves programmatically configuring the build to use a specific Java executable based on the operating system. We will do this by creating a custom **Java Toolchain** configuration that points to your project-local JDKs.
+
+This approach is more robust and elegant than a wrapper script.
+
+### The Core Concept: Programmatic `JavaLauncher` Configuration
+
+The key is to tell all Gradle tasks that fork a new Java process (like compiling, testing, and running) to use a specific `java` executable from your bundled JDK. These tasks (`JavaCompile`, `Test`, `JavaExec`) all have a `javaLauncher` property that we can configure.
+
+We will add logic to `build.gradle.kts` that:
+1.  Detects the current operating system (Windows or Linux/macOS).
+2.  Selects the path to the appropriate bundled JDK (`.jdk-windows` or `.jdk-linux`).
+3.  Creates a `JavaLauncher` provider configured with that path.
+4.  Applies this custom launcher to all relevant tasks.
+
+### Step 1: Prepare Your Project Structure
+
+First, ensure your project has the two separate, platform-specific JDKs you've prepared:
+
+```
+my-lambda-function/
+├── .jdk-linux/               <-- The prepared JDK for Linux/macOS
+│   ├── bin/
+│   └── lib/
+├── .jdk-windows/             <-- The prepared JDK for Windows
+│   ├── bin/
+│   └── lib/
+├── config/
+│   └── checkstyle/
+├── gradle/
+├── src/
+├── build.gradle.kts          <-- We will modify this file
+├── gradlew
+├── gradlew.bat
+└── settings.gradle.kts
+```
+
+### Step 2: The "Native Way" `build.gradle.kts`
+
+Replace the contents of your `build.gradle.kts` with this complete, self-contained solution. The magic happens in the `// --- NATIVE JDK CONFIGURATION ---` block.
+
+```kotlin
+import org.gradle.internal.os.OperatingSystem
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
+
+// build.gradle.kts
+
+plugins {
+    application
+    `java-library`
+    id("com.github.johnrengelman.shadow") version "8.1.1"
+}
+
+group = "com.mycompany.lambda"
+version = "1.0-SNAPSHOT"
+
+repositories {
+    mavenCentral()
+}
+
+// --- NATIVE JDK CONFIGURATION ---
+// This block programmatically configures Gradle to use a project-local JDK.
+
+// 1. Get the JavaToolchainService, which helps us create custom toolchains.
+val toolchainService = extensions.getByType<JavaToolchainService>()
+
+// 2. Detect the OS and determine the correct path to our bundled JDK.
+val jdkPath = if (OperatingSystem.current().isWindows) {
+    file(".jdk-windows")
+} else {
+    file(".jdk-linux")
+}
+
+// 3. Create a custom JavaLauncher Provider. This tells Gradle exactly which
+//    'java' executable to use. We specify the path to our bundled JDK.
+val customLauncher = toolchainService.launcherFor {
+    languageVersion.set(JavaLanguageVersion.of(17)) // Still declare the version
+    installationPath.set(jdkPath) // The magic: point to our local JDK folder
+}
+
+// 4. Apply our custom launcher to all tasks that run Java.
+tasks.withType<JavaCompile>().configureEach {
+    javaCompiler.set(customLauncher)
+}
+tasks.withType<Test>().configureEach {
+    javaLauncher.set(customLauncher)
+}
+tasks.withType<JavaExec>().configureEach {
+    javaLauncher.set(customLauncher)
+}
+// --- END OF NATIVE JDK CONFIGURATION ---
+
+
+// Configure the application plugin to use our LocalRunner for local testing
+application {
+    mainClass.set("com.mycompany.lambda.LocalRunner")
+}
+
+dependencies {
+    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+    implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+}
+
+// Configure the Shadow JAR plugin for the Lambda package
+tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {
+    archiveClassifier.set("lambda-all")
+}
+```
+
+### Step 3: How to Use It
+
+That's it! You have now embedded the logic directly into your build. **No wrapper script is needed.**
+
+You can now run the standard Gradle commands, and they will automatically use the correct bundled JDK for the platform you are on.
+
+*   **To build the Lambda package:**
+    ```bash
+    # On Linux, this will use .jdk-linux/bin/java
+    # On Windows, this will use .jdk-windows/bin/java.exe
+    ./gradlew build
+    ```
+
+*   **To run your local test harness:**
+    ```bash
+    ./gradlew run
+    ```
+
+### Why This Approach is Better
+
+*   **Truly Self-Contained:** The build logic is entirely within `build.gradle.kts`. A user just needs to clone the repo and run `./gradlew`.
+*   **IDE-Friendly:** IDEs like IntelliJ that import Gradle projects will correctly identify and use the specified toolchain, making the development experience seamless.
+*   **Robust and Declarative:** You are using Gradle's official APIs (`JavaToolchainService`) to declare your intent, which is less brittle than manipulating environment variables in an external script.
+*   **No Extra Commands:** Your team uses the standard, idiomatic Gradle tasks without needing to remember to run a custom script.
 
 
 ---
